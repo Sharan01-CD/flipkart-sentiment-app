@@ -84,7 +84,6 @@ def load_model():
             max_iter=1000,
             C=1.0,
             solver='lbfgs',
-            multi_class='multinomial',
             random_state=42
         ))
     ])
