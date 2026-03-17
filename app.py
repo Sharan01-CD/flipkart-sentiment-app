@@ -1,14 +1,10 @@
 import streamlit as st
-import pandas as pd
 import re
-import nltk
 import pickle
+import nltk
 import os
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
-from sklearn.pipeline import Pipeline
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
 
 # ─────────────────────────────────────────────────────────────
 # Page Config
@@ -27,7 +23,7 @@ nltk.download('wordnet', quiet=True)
 nltk.download('omw-1.4', quiet=True)
 
 # ─────────────────────────────────────────────────────────────
-# Globals (no nested cache)
+# Globals
 # ─────────────────────────────────────────────────────────────
 lemmatizer = WordNetLemmatizer()
 stop_words  = set(stopwords.words('english'))
@@ -46,45 +42,12 @@ def clean_text(text):
     return " ".join(tokens)
 
 # ─────────────────────────────────────────────────────────────
-# Load / Train Model
+# Load Pre-trained Model
 # ─────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    if os.path.exists("sentiment_model.pkl"):
-        with open("sentiment_model.pkl", "rb") as f:
-            return pickle.load(f)
-
-    df = pd.read_csv("product_reviews_.csv")
-    df['cleaned_review']  = df['review'].apply(clean_text)
-    df['cleaned_summary'] = df['summary'].apply(clean_text)
-    df['combined_text']   = df['cleaned_review'] + " " + df['cleaned_summary']
-    df = df[df['combined_text'].str.strip() != ""].reset_index(drop=True)
-
-    label_map = {'positive': 2, 'neutral': 1, 'negative': 0}
-    df['label'] = df['sentiment'].str.lower().map(label_map)
-
-    X = df['combined_text']
-    y = df['label']
-
-    pipeline = Pipeline([
-        ('tfidf', TfidfVectorizer(
-            max_features=50000,
-            ngram_range=(1, 2),
-            min_df=2,
-            sublinear_tf=True
-        )),
-        ('clf', LogisticRegression(
-            max_iter=1000,
-            C=1.0,
-            random_state=42
-        ))
-    ])
-    pipeline.fit(X, y)
-
-    with open("sentiment_model.pkl", "wb") as f:
-        pickle.dump(pipeline, f)
-
-    return pipeline
+    with open("sentiment_model.pkl", "rb") as f:
+        return pickle.load(f)
 
 # ─────────────────────────────────────────────────────────────
 # UI
@@ -93,7 +56,7 @@ st.title("🛒 Flipkart Review Sentiment Analyzer")
 st.markdown("Enter a product review below and get instant sentiment prediction.")
 st.markdown("---")
 
-with st.spinner("Loading model... (first run trains on your data, ~30 sec)"):
+with st.spinner("Loading model..."):
     model = load_model()
 
 st.success("Model ready!", icon="✅")
@@ -101,7 +64,7 @@ st.success("Model ready!", icon="✅")
 st.subheader("📝 Enter Your Review")
 review_input = st.text_area(
     label="Review text",
-    placeholder="e.g. The product quality is amazing, totally worth the price!",
+    placeholder="e.g. Worst product ever, complete waste of money!",
     height=150,
     label_visibility="collapsed"
 )
@@ -149,4 +112,4 @@ if predict_btn:
             st.code(cleaned if cleaned else "(empty after cleaning)")
 
 st.markdown("---")
-st.caption("Built with Streamlit · Logistic Regression + TF-IDF · Trained on Flipkart Reviews")
+st.caption("Built with Streamlit · Logistic Regression + TF-IDF · Trained on 205k Real Flipkart Reviews")
