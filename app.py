@@ -1,10 +1,11 @@
 import streamlit as st
-import re
+import numpy as np
 import pickle
+import re
 import nltk
-import os
 from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 # ─────────────────────────────────────────────────────────────
 # Page Config
@@ -20,50 +21,44 @@ st.set_page_config(
 # ─────────────────────────────────────────────────────────────
 nltk.download('stopwords', quiet=True)
 nltk.download('wordnet', quiet=True)
-nltk.download('omw-1.4', quiet=True)
 
 # ─────────────────────────────────────────────────────────────
-# Globals
-# ─────────────────────────────────────────────────────────────
-lemmatizer = WordNetLemmatizer()
-stop_words  = set(stopwords.words('english'))
-
-# ─────────────────────────────────────────────────────────────
-# Text Cleaning
-# ─────────────────────────────────────────────────────────────
-def clean_text(text):
-    if not isinstance(text, str):
-        return ""
-    text = text.lower()
-    text = re.sub(r'http\S+|www\S+', '', text)
-    text = re.sub(r'[^a-z\s]', '', text)
-    tokens = text.split()
-    tokens = [lemmatizer.lemmatize(w) for w in tokens if w not in stop_words]
-    return " ".join(tokens)
-
-# ─────────────────────────────────────────────────────────────
-# Load Pre-trained Model
+# Load Model & Tokenizer
 # ─────────────────────────────────────────────────────────────
 @st.cache_resource
-def load_model():
-    with open("sentiment_model.pkl", "rb") as f:
-        return pickle.load(f)
+def load_artifacts():
+    model     = load_model("lstm_sentiment_model.h5")
+    with open("tokenizer.pkl", "rb") as f:
+        tokenizer = pickle.load(f)
+    return model, tokenizer
+
+# ─────────────────────────────────────────────────────────────
+# Predict
+# ─────────────────────────────────────────────────────────────
+MAX_LEN = 50
+
+def predict_sentiment(text, model, tokenizer):
+    seq     = tokenizer.texts_to_sequences([text])
+    padded  = pad_sequences(seq, maxlen=MAX_LEN, padding='post', truncating='post')
+    proba   = model.predict(padded, verbose=0)[0]
+    pred    = np.argmax(proba)
+    return pred, proba
 
 # ─────────────────────────────────────────────────────────────
 # UI
 # ─────────────────────────────────────────────────────────────
 st.title("🛒 Flipkart Review Sentiment Analyzer")
-st.markdown("Enter a product review below and get instant sentiment prediction.")
+st.markdown("Powered by **Deep Learning (LSTM)** · Trained on 205k real Flipkart reviews")
 st.markdown("---")
 
-with st.spinner("Loading model..."):
-    model = load_model()
+with st.spinner("Loading LSTM model..."):
+    model, tokenizer = load_artifacts()
 
 st.success("Model ready!", icon="✅")
 
 st.subheader("📝 Enter Your Review")
 review_input = st.text_area(
-    label="Review text",
+    label="Review",
     placeholder="e.g. Worst product ever, complete waste of money!",
     height=150,
     label_visibility="collapsed"
@@ -75,9 +70,7 @@ if predict_btn:
     if not review_input.strip():
         st.warning("Please enter a review before clicking Analyze.")
     else:
-        cleaned = clean_text(review_input)
-        pred    = model.predict([cleaned])[0]
-        proba   = model.predict_proba([cleaned])[0]
+        pred, proba = predict_sentiment(review_input, model, tokenizer)
 
         label_map  = {2: "Positive", 1: "Neutral", 0: "Negative"}
         emoji_map  = {2: "😊", 1: "😐", 0: "😠"}
@@ -108,8 +101,5 @@ if predict_btn:
             st.markdown(f"**{label}** — {score*100:.1f}%")
             st.progress(float(score))
 
-        with st.expander("🔎 See cleaned text used for prediction"):
-            st.code(cleaned if cleaned else "(empty after cleaning)")
-
 st.markdown("---")
-st.caption("Built with Streamlit · Logistic Regression + TF-IDF · Trained on 205k Real Flipkart Reviews")
+st.caption("Built with Streamlit · BiLSTM Deep Learning · 95.17% Accuracy · Trained on 205k Real Flipkart Reviews")
