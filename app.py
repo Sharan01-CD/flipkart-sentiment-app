@@ -2,9 +2,6 @@ import streamlit as st
 import numpy as np
 import pickle
 import nltk
-import os
-os.environ["KERAS_BACKEND"] = "jax"
-
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 
@@ -29,27 +26,29 @@ nltk.download('wordnet', quiet=True)
 lemmatizer = WordNetLemmatizer()
 stop_words  = set(stopwords.words('english'))
 MAX_LEN     = 50
+INPUT_NAME  = 'input_layer_3'
 
 # ─────────────────────────────────────────────────────────────
 # Load Model & Tokenizer
 # ─────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_artifacts():
-    import tf_keras as keras
-    from tf_keras.preprocessing.sequence import pad_sequences
-    model     = keras.models.load_model("lstm_sentiment_model.h5")
+    import onnxruntime as ort
+    from keras.preprocessing.sequence import pad_sequences
+    session   = ort.InferenceSession("lstm_model.onnx")
     with open("tokenizer.pkl", "rb") as f:
         tokenizer = pickle.load(f)
-    return model, tokenizer
+    return session, tokenizer
 
 # ─────────────────────────────────────────────────────────────
 # Predict
 # ─────────────────────────────────────────────────────────────
-def predict_sentiment(text, model, tokenizer):
-    from tf_keras.preprocessing.sequence import pad_sequences
+def predict_sentiment(text, session, tokenizer):
+    from keras.preprocessing.sequence import pad_sequences
     seq    = tokenizer.texts_to_sequences([text])
     padded = pad_sequences(seq, maxlen=MAX_LEN, padding='post', truncating='post')
-    proba  = model.predict(padded, verbose=0)[0]
+    input_data = padded.astype(np.float32)
+    proba  = session.run(None, {INPUT_NAME: input_data})[0][0]
     pred   = np.argmax(proba)
     return pred, proba
 
@@ -57,11 +56,11 @@ def predict_sentiment(text, model, tokenizer):
 # UI
 # ─────────────────────────────────────────────────────────────
 st.title("🛒 Flipkart Review Sentiment Analyzer")
-st.markdown("Powered by **Deep Learning (LSTM)** · Trained on 205k real Flipkart reviews")
+st.markdown("Powered by **Deep Learning (BiLSTM)** · Trained on 205k real Flipkart reviews")
 st.markdown("---")
 
-with st.spinner("Loading LSTM model..."):
-    model, tokenizer = load_artifacts()
+with st.spinner("Loading model..."):
+    session, tokenizer = load_artifacts()
 
 st.success("Model ready!", icon="✅")
 
@@ -79,7 +78,7 @@ if predict_btn:
     if not review_input.strip():
         st.warning("Please enter a review before clicking Analyze.")
     else:
-        pred, proba = predict_sentiment(review_input, model, tokenizer)
+        pred, proba = predict_sentiment(review_input, session, tokenizer)
 
         label_map  = {2: "Positive", 1: "Neutral", 0: "Negative"}
         emoji_map  = {2: "😊", 1: "😐", 0: "😠"}
