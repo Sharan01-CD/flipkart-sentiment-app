@@ -2,59 +2,49 @@ import streamlit as st
 import numpy as np
 import pickle
 import nltk
+import re
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 
-# ─────────────────────────────────────────────────────────────
-# Page Config
-# ─────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Flipkart Sentiment Analyzer",
     page_icon="🛒",
     layout="centered"
 )
 
-# ─────────────────────────────────────────────────────────────
-# NLTK Downloads
-# ─────────────────────────────────────────────────────────────
 nltk.download('stopwords', quiet=True)
 nltk.download('wordnet', quiet=True)
 
-# ─────────────────────────────────────────────────────────────
-# Globals
-# ─────────────────────────────────────────────────────────────
 lemmatizer = WordNetLemmatizer()
 stop_words  = set(stopwords.words('english'))
 MAX_LEN     = 50
-INPUT_NAME  = 'input_layer_3'
 
-# ─────────────────────────────────────────────────────────────
-# Load Model & Tokenizer
-# ─────────────────────────────────────────────────────────────
+# ── Manual Tokenizer Padding (no keras needed) ──────────────
+def texts_to_padded(texts, tokenizer, maxlen):
+    sequences = tokenizer.texts_to_sequences(texts)
+    padded = np.zeros((len(sequences), maxlen), dtype=np.float32)
+    for i, seq in enumerate(sequences):
+        if len(seq) > maxlen:
+            padded[i] = seq[:maxlen]
+        else:
+            padded[i, :len(seq)] = seq
+    return padded
+
 @st.cache_resource
 def load_artifacts():
     import onnxruntime as ort
-    from keras.preprocessing.sequence import pad_sequences
-    session   = ort.InferenceSession("lstm_model.onnx")
+    session = ort.InferenceSession("lstm_model.onnx")
     with open("tokenizer.pkl", "rb") as f:
         tokenizer = pickle.load(f)
     return session, tokenizer
 
-# ─────────────────────────────────────────────────────────────
-# Predict
-# ─────────────────────────────────────────────────────────────
 def predict_sentiment(text, session, tokenizer):
-    from keras.preprocessing.sequence import pad_sequences
-    seq    = tokenizer.texts_to_sequences([text])
-    padded = pad_sequences(seq, maxlen=MAX_LEN, padding='post', truncating='post')
-    input_data = padded.astype(np.float32)
-    proba  = session.run(None, {INPUT_NAME: input_data})[0][0]
-    pred   = np.argmax(proba)
+    padded = texts_to_padded([text], tokenizer, MAX_LEN)
+    proba  = session.run(None, {'input_layer_3': padded})[0][0]
+    pred   = int(np.argmax(proba))
     return pred, proba
 
-# ─────────────────────────────────────────────────────────────
-# UI
-# ─────────────────────────────────────────────────────────────
+# ── UI ───────────────────────────────────────────────────────
 st.title("🛒 Flipkart Review Sentiment Analyzer")
 st.markdown("Powered by **Deep Learning (BiLSTM)** · Trained on 205k real Flipkart reviews")
 st.markdown("---")
