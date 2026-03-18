@@ -19,29 +19,28 @@ lemmatizer = WordNetLemmatizer()
 stop_words  = set(stopwords.words('english'))
 MAX_LEN     = 50
 
-# ── Manual Tokenizer Padding (no keras needed) ──────────────
-def texts_to_padded(texts, tokenizer, maxlen):
-    sequences = tokenizer.texts_to_sequences(texts)
-    padded = np.zeros((len(sequences), maxlen), dtype=np.float32)
-    for i, seq in enumerate(sequences):
-        if len(seq) > maxlen:
-            padded[i] = seq[:maxlen]
-        else:
-            padded[i, :len(seq)] = seq
+# ── Tokenizer (no keras needed) ─────────────────────────────
+def texts_to_padded(texts, word_index, maxlen, oov_index=1):
+    padded = np.zeros((len(texts), maxlen), dtype=np.float32)
+    for i, text in enumerate(texts):
+        seq = [word_index.get(w, oov_index) for w in text.lower().split()]
+        seq = seq[:maxlen]
+        padded[i, :len(seq)] = seq
     return padded
 
 @st.cache_resource
 def load_artifacts():
     import onnxruntime as ort
     session = ort.InferenceSession("lstm_model.onnx")
-    with open("tokenizer.pkl", "rb") as f:
+    with open("simple_tokenizer.pkl", "rb") as f:
         tokenizer = pickle.load(f)
     return session, tokenizer
 
 def predict_sentiment(text, session, tokenizer):
-    padded = texts_to_padded([text], tokenizer, MAX_LEN)
-    proba  = session.run(None, {'input_layer_3': padded})[0][0]
-    pred   = int(np.argmax(proba))
+    word_index = tokenizer['word_index']
+    padded     = texts_to_padded([text], word_index, MAX_LEN)
+    proba      = session.run(None, {'input_layer_3': padded})[0][0]
+    pred       = int(np.argmax(proba))
     return pred, proba
 
 # ── UI ───────────────────────────────────────────────────────
