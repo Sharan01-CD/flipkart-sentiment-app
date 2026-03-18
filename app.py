@@ -1,11 +1,12 @@
 import streamlit as st
 import numpy as np
 import pickle
-import re
 import nltk
+import os
+os.environ["KERAS_BACKEND"] = "jax"
+
 from nltk.corpus import stopwords
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+from nltk.stem import WordNetLemmatizer
 
 # ─────────────────────────────────────────────────────────────
 # Page Config
@@ -23,11 +24,20 @@ nltk.download('stopwords', quiet=True)
 nltk.download('wordnet', quiet=True)
 
 # ─────────────────────────────────────────────────────────────
+# Globals
+# ─────────────────────────────────────────────────────────────
+lemmatizer = WordNetLemmatizer()
+stop_words  = set(stopwords.words('english'))
+MAX_LEN     = 50
+
+# ─────────────────────────────────────────────────────────────
 # Load Model & Tokenizer
 # ─────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_artifacts():
-    model     = load_model("lstm_sentiment_model.h5")
+    import tf_keras as keras
+    from tf_keras.preprocessing.sequence import pad_sequences
+    model     = keras.models.load_model("lstm_sentiment_model.h5")
     with open("tokenizer.pkl", "rb") as f:
         tokenizer = pickle.load(f)
     return model, tokenizer
@@ -35,13 +45,12 @@ def load_artifacts():
 # ─────────────────────────────────────────────────────────────
 # Predict
 # ─────────────────────────────────────────────────────────────
-MAX_LEN = 50
-
 def predict_sentiment(text, model, tokenizer):
-    seq     = tokenizer.texts_to_sequences([text])
-    padded  = pad_sequences(seq, maxlen=MAX_LEN, padding='post', truncating='post')
-    proba   = model.predict(padded, verbose=0)[0]
-    pred    = np.argmax(proba)
+    from tf_keras.preprocessing.sequence import pad_sequences
+    seq    = tokenizer.texts_to_sequences([text])
+    padded = pad_sequences(seq, maxlen=MAX_LEN, padding='post', truncating='post')
+    proba  = model.predict(padded, verbose=0)[0]
+    pred   = np.argmax(proba)
     return pred, proba
 
 # ─────────────────────────────────────────────────────────────
