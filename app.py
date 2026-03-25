@@ -17,7 +17,7 @@ nltk.download('wordnet', quiet=True)
 
 lemmatizer = WordNetLemmatizer()
 stop_words  = set(stopwords.words('english'))
-MAX_LEN     = 50
+MAX_LEN     = 100
 
 # ── Tokenizer (no keras needed) ─────────────────────────────
 def texts_to_padded(texts, word_index, maxlen, oov_index=1):
