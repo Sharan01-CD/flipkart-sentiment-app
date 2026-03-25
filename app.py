@@ -39,7 +39,7 @@ def load_artifacts():
 def predict_sentiment(text, session, tokenizer):
     word_index = tokenizer['word_index']
     padded     = texts_to_padded([text], word_index, MAX_LEN)
-    proba      = session.run(None, {'keras_tensor': padded})[0][0]
+    proba      = session.run(None, {'input_layer': padded})[0][0]
     pred       = int(np.argmax(proba))
     return pred, proba
 
