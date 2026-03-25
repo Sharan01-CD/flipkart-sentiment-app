@@ -21,7 +21,7 @@ MAX_LEN     = 50
 
 # ── Tokenizer (no keras needed) ─────────────────────────────
 def texts_to_padded(texts, word_index, maxlen, oov_index=1):
-    padded = np.zeros((len(texts), maxlen), dtype=np.float32)
+    padded = np.zeros((len(texts), maxlen), dtype=np.int32) 
     for i, text in enumerate(texts):
         seq = [word_index.get(w, oov_index) for w in text.lower().split()]
         seq = seq[:maxlen]
