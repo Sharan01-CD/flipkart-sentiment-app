@@ -59,8 +59,8 @@ def predict_sentiment(text, session, tokenizer):
 
     input_name = session.get_inputs()[0].name
 
-    # ✅ Ensure correct datatype (VERY IMPORTANT)
-    padded = padded.astype(np.float32)
+    # 🔥 FIX (most important)
+    padded = padded.astype(np.int64)
 
     proba = session.run(None, {input_name: padded})[0][0]
 
