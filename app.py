@@ -4,7 +4,6 @@ import pickle
 import nltk
 import re
 import os
-import gdown
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 
@@ -29,14 +28,15 @@ ONNX_FILE_ID      = "YOUR_ONNX_FILE_ID"       # ← replace this
 TOKENIZER_FILE_ID = "YOUR_TOKENIZER_FILE_ID"   # ← replace this
 # ────────────────────────────────────────────────────────────────
 
-def download_models(force=False):
-    if force or not os.path.exists(ONNX_FILE):
-        with st.spinner("Downloading model..."):
-            gdown.download(f"https://drive.google.com/uc?id={ONNX_FILE_ID}", ONNX_FILE, quiet=False)
+import pickle
 
-    if force or not os.path.exists(TOKENIZER_FILE):
-        with st.spinner("Downloading tokenizer..."):
-            gdown.download(f"https://drive.google.com/uc?id={TOKENIZER_FILE_ID}", TOKENIZER_FILE, quiet=False)
+# Load tokenizer
+with open("simple_tokenizer.pkl", "rb") as f:
+    tokenizer = pickle.load(f)
+
+# Load ONNX model
+import onnxruntime as ort
+session = ort.InferenceSession("lstm_model.onnx")
 
 # ── Text cleaning ────────────────────────────────────────────────
 def clean_text(text):
