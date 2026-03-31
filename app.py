@@ -36,6 +36,23 @@ def load_artifacts():
         tokenizer = pickle.load(f)
     return session, tokenizer
 
+def clean_text(text):
+    import re
+    from nltk.corpus import stopwords
+    from nltk.stem import WordNetLemmatizer
+
+    lemmatizer = WordNetLemmatizer()
+    stop_words = set(stopwords.words('english'))
+
+    text = text.lower()
+    text = re.sub(r'http\S+|www\S+', '', text)
+    text = re.sub(r'[^a-z\s]', '', text)
+
+    tokens = text.split()
+    tokens = [lemmatizer.lemmatize(w) for w in tokens if w not in stop_words]
+
+    return " ".join(tokens)
+
 def predict_sentiment(text, session, tokenizer):
     cleaned = clean_text(text)
     word_index = tokenizer['word_index']
