@@ -56,7 +56,14 @@ def predict_sentiment(text, session, tokenizer):
     cleaned = clean_text(text)
     word_index = tokenizer['word_index']
     padded = texts_to_padded([cleaned], word_index, MAX_LEN)
-    proba = session.run(None, {'input_layer': padded})[0][0]
+
+    input_name = session.get_inputs()[0].name
+
+    # ✅ Ensure correct datatype (VERY IMPORTANT)
+    padded = padded.astype(np.float32)
+
+    proba = session.run(None, {input_name: padded})[0][0]
+
     pred = int(np.argmax(proba))
     return pred, proba
 
