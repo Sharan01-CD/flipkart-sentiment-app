@@ -37,12 +37,21 @@ def load_artifacts():
     return session, tokenizer
 
 def predict_sentiment(text, session, tokenizer):
+    cleaned = clean_text(text)
     word_index = tokenizer['word_index']
-    padded     = texts_to_padded([text], word_index, MAX_LEN)
-    proba      = session.run(None, {'input_layer_3': padded})[0][0]
-    pred       = int(np.argmax(proba))
-    return pred, proba
+    padded = texts_to_padded([cleaned], word_index, MAX_LEN)
 
+    # ✅ ALWAYS get input name dynamically
+    input_name = session.get_inputs()[0].name
+
+    # ✅ LSTM models need int64
+    padded = padded.astype(np.int64)
+
+    # ✅ Use dynamic name (NOT hardcoded)
+    proba = session.run(None, {input_name: padded})[0][0]
+
+    pred = int(np.argmax(proba))
+    return pred, proba
 # ── UI ───────────────────────────────────────────────────────
 st.title("🛒 Flipkart Review Sentiment Analyzer")
 st.markdown("Powered by **Deep Learning (BiLSTM)** · Trained on 205k real Flipkart reviews")
