@@ -1,4 +1,5 @@
 streamlit
-numpy
 onnxruntime
 nltk
+numpy
+scikit-learn

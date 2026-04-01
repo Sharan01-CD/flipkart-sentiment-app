@@ -3,6 +3,7 @@ import numpy as np
 import pickle
 import nltk
 import re
+import os
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 
@@ -17,9 +18,23 @@ nltk.download('wordnet', quiet=True)
 
 lemmatizer = WordNetLemmatizer()
 stop_words  = set(stopwords.words('english'))
-MAX_LEN     = 50
+MAX_LEN     = 100
 
-# ── Tokenizer (no keras needed) ─────────────────────────────
+ONNX_FILE      = "lstm_model.onnx"
+TOKENIZER_FILE = "simple_tokenizer.pkl"
+
+# ── Text cleaning ────────────────────────────────────────────────
+def clean_text(text):
+    if not isinstance(text, str):
+        return ""
+    text = text.lower()
+    text = re.sub(r'http\S+|www\S+', '', text)
+    text = re.sub(r'[^a-z\s]', '', text)
+    tokens = text.split()
+    tokens = [lemmatizer.lemmatize(w) for w in tokens if w not in stop_words]
+    return " ".join(tokens)
+
+# ── Tokenizer ────────────────────────────────────────────────────
 def texts_to_padded(texts, word_index, maxlen, oov_index=1):
     padded = np.zeros((len(texts), maxlen), dtype=np.float32)
     for i, text in enumerate(texts):
@@ -28,52 +43,47 @@ def texts_to_padded(texts, word_index, maxlen, oov_index=1):
         padded[i, :len(seq)] = seq
     return padded
 
+# ── Load model ───────────────────────────────────────────────────
 @st.cache_resource
 def load_artifacts():
     import onnxruntime as ort
-    session = ort.InferenceSession("lstm_model.onnx")
-    with open("simple_tokenizer.pkl", "rb") as f:
+    session = ort.InferenceSession(ONNX_FILE)
+    with open(TOKENIZER_FILE, "rb") as f:
         tokenizer = pickle.load(f)
     return session, tokenizer
 
-def clean_text(text):
-    import re
-    from nltk.corpus import stopwords
-    from nltk.stem import WordNetLemmatizer
-
-    lemmatizer = WordNetLemmatizer()
-    stop_words = set(stopwords.words('english'))
-
-    text = text.lower()
-    text = re.sub(r'http\S+|www\S+', '', text)
-    text = re.sub(r'[^a-z\s]', '', text)
-
-    tokens = text.split()
-    tokens = [lemmatizer.lemmatize(w) for w in tokens if w not in stop_words]
-
-    return " ".join(tokens)
-
 def predict_sentiment(text, session, tokenizer):
-    cleaned = clean_text(text)
+    cleaned    = clean_text(text)
     word_index = tokenizer['word_index']
-    padded = texts_to_padded([cleaned], word_index, MAX_LEN)
-
-    # ✅ ALWAYS get input name dynamically
-    input_name = session.get_inputs()[0].name
-
-    # ✅ LSTM models need int64
-    padded = padded.astype(np.int64)
-
-    # ✅ Use dynamic name (NOT hardcoded)
-    proba = session.run(None, {input_name: padded})[0][0]
-
-    pred = int(np.argmax(proba))
+    padded     = texts_to_padded([cleaned], word_index, MAX_LEN)
+    input_name = session.get_inputs()[0].name  # ✅ dynamic input name
+    proba      = session.run(None, {input_name: padded})[0][0]
+    pred       = int(np.argmax(proba))
     return pred, proba
-# ── UI ───────────────────────────────────────────────────────
+
+# ── UI ───────────────────────────────────────────────────────────
 st.title("🛒 Flipkart Review Sentiment Analyzer")
 st.markdown("Powered by **Deep Learning (BiLSTM)** · Trained on 205k real Flipkart reviews")
 st.markdown("---")
 
+# ── Sidebar ──────────────────────────────────────────────────────
+with st.sidebar:
+    st.header("⚙️ Model Management")
+    st.markdown("After retraining in Colab, push new model files to GitHub and click reload:")
+
+    if st.button("🔄 Reload Model", use_container_width=True):
+        st.cache_resource.clear()
+        st.success("✅ Model reloaded!")
+        st.rerun()
+
+    st.markdown("---")
+    st.markdown("**Workflow:**")
+    st.markdown("1. Update dataset in Colab")
+    st.markdown("2. Retrain & export new ONNX")
+    st.markdown("3. Replace files & push to GitHub")
+    st.markdown("4. Click **Reload Model**")
+
+# ── Load model ───────────────────────────────────────────────────
 with st.spinner("Loading model..."):
     session, tokenizer = load_artifacts()
 
